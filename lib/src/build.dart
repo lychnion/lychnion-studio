@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:sqlite3/sqlite3.dart';
 
+import 'check.dart';
 import 'draft.dart';
 
 // Writes a guide file (<id>.sqlite) from a draft, with the tables and
@@ -18,7 +19,8 @@ class BuildError implements Exception {
 }
 
 /// Builds [draft] into `<outDir>/<id>.sqlite` and returns that file.
-/// Throws [BuildError] listing what is wrong with the draft.
+/// Throws [BuildError] listing what is wrong with the draft, or
+/// [GuideProblem] when the built file would not open in the app.
 File buildGuide(Map<String, Object?> draft, Directory outDir) {
   final problems = draftProblems(draft);
   if (problems.isNotEmpty) throw BuildError(problems);
@@ -110,5 +112,13 @@ File buildGuide(Map<String, Object?> draft, Directory outDir) {
     rethrow;
   }
   db.close();
+  // Checked before it replaces a guide built earlier: a guide the app
+  // could not open never takes the place of one it can.
+  try {
+    checkGuide(tmp.path);
+  } on GuideProblem {
+    tmp.deleteSync();
+    rethrow;
+  }
   return tmp.renameSync(out.path);
 }

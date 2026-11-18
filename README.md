@@ -26,7 +26,8 @@ to keep your key: [docs/publishing.md](docs/publishing.md).
 The guide format is the one Lychnion's own guides use (built by
 `tool/build_package.py` in lychnion-data). Pure Dart, no Flutter.
 
-Not yet: PDFs, translation, a desktop window.
+Not yet: PDFs and pages in Shift_JIS or EUC-JP (copy their text into a
+UTF-8 text file, see the guide), translation, a desktop window.
 
 ## Licence
 

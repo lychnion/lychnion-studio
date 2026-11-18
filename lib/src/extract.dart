@@ -15,22 +15,33 @@ const minPassageChars = 25;
 /// A heading line in the extracted text starts with this.
 const headingMark = '## ';
 
-const _block = {'p', 'li', 'div', 'tr', 'br', 'td', 'th', 'dd', 'dt'};
-const _heading = {'h1', 'h2', 'h3', 'h4'};
+const _block = {
+  'p', 'li', 'div', 'tr', 'br', 'td', 'th', 'dd', 'dt', 'section', //
+  'article', 'ul', 'ol', 'dl', 'table', 'blockquote', 'pre', 'figure',
+  'figcaption', 'details', 'summary', 'aside', 'address', 'hr',
+};
+const _heading = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6'};
+
+/// Never text people read: scripts, menus, furigana (ruby text), struck
+/// out text.
 const _skip = {
-  'script',
-  'style',
-  'nav',
-  'header',
-  'footer',
-  'noscript',
-  'template',
-  'svg',
-  'form',
+  'script', 'style', 'noscript', 'template', 'svg', 'nav', 'rt', 'rp', //
+  'del', 's', 'select', 'button', 'iframe', 'object',
 };
 
+/// Page header and footer: skipped around the main part of a page, kept
+/// inside it (an article's header often holds its title).
+const _pageFrame = {'header', 'footer'};
+
 /// Page furniture on Japanese government sites, not content.
-const _dropLines = {'子項目を開閉', 'この記事で伝えたいトピックス', '関連リンク', 'ページの先頭へ', '印刷'};
+const _dropLines = {
+  '子項目を開閉',
+  'この記事で伝えたいトピックス',
+  '関連リンク',
+  'ページの先頭へ',
+  '印刷',
+  'このページの本文へ移動',
+};
 
 /// A web page: its title and its text, headings marked with `## `.
 class PageText {
@@ -39,55 +50,147 @@ class PageText {
   final String text;
 }
 
-/// The text of an HTML page: only its main part when it marks one
-/// (`<main>`, `role="main"` or `<article>`), without menus, scripts and
-/// forms.
+/// The text of an HTML page: its main part when it marks one (`<main>`,
+/// `role="main"` or `<article>`, the largest one) and that holds most of
+/// the page's text, else the whole page; without menus, scripts and
+/// hidden text.
 PageText pageText(String source) {
   final doc = html.parse(source);
-  final root =
-      doc.querySelector('main') ??
-      doc.querySelector('[role=main]') ??
-      doc.querySelector('article') ??
-      doc.body;
+  final body = doc.body;
+  final all = body == null ? 0 : _textSize(body);
+  Element? root = body;
+  var size = 0;
+  for (final e in _all(
+    doc.documentElement,
+    (e) =>
+        e.localName == 'main' ||
+        e.localName == 'article' ||
+        e.attributes['role'] == 'main',
+  )) {
+    final n = _textSize(e);
+    if (n > size) (root, size) = (e, n);
+  }
+  // A small "main" (a card, a teaser) would leave most of the page out.
+  if (size < all * 0.2) root = body;
   final out = StringBuffer();
-  if (root != null) _walk(root, out);
-  final title = _oneLine(doc.querySelector('title')?.text ?? '');
-  final h1 = _oneLine(root?.querySelector('h1')?.text ?? '');
+  if (root != null) _walk(root, out, page: identical(root, body));
+  final title = _shortText(
+    _all(doc.documentElement, (e) => e.localName == 'title').firstOrNull,
+  );
+  final h1 = _shortText(_all(root, (e) => e.localName == 'h1').firstOrNull);
   return PageText(title.isNotEmpty ? title : h1, out.toString());
 }
 
-void _walk(Node node, StringBuffer out) {
-  for (final child in node.nodes) {
-    if (child is Text) {
-      out.write(child.data);
-    } else if (child is Element) {
-      final tag = child.localName ?? '';
-      if (_skip.contains(tag)) continue;
-      if (_heading.contains(tag)) {
-        out.write('\n$headingMark');
-        _walk(child, out);
-        out.write('\n');
-      } else {
-        if (_block.contains(tag)) out.write('\n');
-        _walk(child, out);
-      }
+/// How much text [e] holds, without spaces. A loop, not recursion (the
+/// html package's `text` recurses and overflows on deeply nested pages).
+int _textSize(Element e) {
+  var n = 0;
+  final stack = <Node>[e];
+  while (stack.isNotEmpty) {
+    final node = stack.removeLast();
+    if (node is Text) {
+      n += node.data.replaceAll(RegExp(r'\s+'), '').length;
+    } else {
+      stack.addAll(node.nodes);
     }
+  }
+  return n;
+}
+
+/// The elements under [root] (and [root]) that [test] picks, in page
+/// order. A loop, not recursion, like [_textSize].
+List<Element> _all(Element? root, bool Function(Element) test) {
+  final out = <Element>[];
+  if (root == null) return out;
+  final stack = <Element>[root];
+  while (stack.isNotEmpty) {
+    final e = stack.removeLast();
+    if (test(e)) out.add(e);
+    stack.addAll(e.children.reversed);
+  }
+  return out;
+}
+
+/// The text of a small element (a title or a heading).
+String _shortText(Element? e) {
+  if (e == null || _textSize(e) > 1000) return '';
+  return _oneLine(e.text);
+}
+
+bool _hidden(Element e) =>
+    e.attributes.containsKey('hidden') || e.attributes['aria-hidden'] == 'true';
+
+/// Writes the text of [root]; a loop, not recursion, so deeply nested
+/// pages cannot overflow the stack.
+void _walk(Element root, StringBuffer out, {required bool page}) {
+  // Work items: a node to visit, or text to write after an element.
+  final stack = <Object>[...root.nodes.reversed];
+  var pre = 0;
+  while (stack.isNotEmpty) {
+    final item = stack.removeLast();
+    if (item is String) {
+      if (item == '</pre>') {
+        pre--;
+      } else {
+        out.write(item);
+      }
+      continue;
+    }
+    if (item is Text) {
+      out.write(
+        pre > 0 ? item.data : item.data.replaceAll(RegExp(r'\s+'), ' '),
+      );
+      continue;
+    }
+    if (item is! Element) continue;
+    final tag = item.localName ?? '';
+    if (_skip.contains(tag) || _hidden(item)) continue;
+    if (page && _pageFrame.contains(tag)) continue;
+    if (_heading.contains(tag)) {
+      out.write('\n$headingMark');
+      stack.add('\n');
+    } else if (_block.contains(tag)) {
+      out.write('\n');
+      stack.add('\n');
+    }
+    if (tag == 'pre') {
+      pre++;
+      stack.add('</pre>');
+    }
+    stack.addAll(item.nodes.reversed);
   }
 }
 
 String _oneLine(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
 
+final _spaces = RegExp(r'[ \t\u3000\u00a0]+');
+
 /// The non-empty lines of [text], with runs of spaces made one.
 List<String> cleanLines(String text) => [
   for (final raw in text.split('\n'))
-    if (raw.replaceAll(RegExp(r'[ \t\u3000\u00a0]+'), ' ').trim()
-        case final line
+    if (raw.replaceAll(_spaces, ' ').trim() case final line
         when line.isNotEmpty && line != '##' && !_dropLines.contains(line))
       line,
 ];
 
 /// A passage: its heading and its text.
 typedef Passage = ({String heading, String text});
+
+/// [line] cut at sentence ends into pieces of up to [max] characters
+/// (a piece without a sentence end in reach is cut at [max]).
+List<String> _pieces(String line, int max) {
+  final out = <String>[];
+  var rest = line;
+  while (rest.runes.length > max) {
+    final head = String.fromCharCodes(rest.runes.take(max));
+    final cut = head.lastIndexOf(RegExp(r'[。！？!?]|\. '));
+    final end = cut > 0 ? cut + 1 : head.length;
+    out.add(rest.substring(0, end).trim());
+    rest = rest.substring(end).trim();
+  }
+  if (rest.isNotEmpty) out.add(rest);
+  return out;
+}
 
 /// Groups [lines] into passages of up to [maxChars], each with the last
 /// heading before it.
@@ -107,9 +210,11 @@ List<Passage> passages(List<String> lines, {int maxChars = maxPassageChars}) {
       heading = line.substring(headingMark.length).trim();
       continue;
     }
-    final size = buf.fold(0, (n, b) => n + b.runes.length);
-    if (buf.isNotEmpty && size + line.runes.length > maxChars) flush();
-    buf.add(line);
+    for (final piece in _pieces(line, maxChars)) {
+      final size = buf.fold(0, (n, b) => n + b.runes.length);
+      if (buf.isNotEmpty && size + piece.runes.length > maxChars) flush();
+      buf.add(piece);
+    }
   }
   flush();
   return [

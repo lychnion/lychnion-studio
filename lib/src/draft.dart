@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'extract.dart';
 import 'fetch.dart';
+import 'shapes.dart';
 
 // A draft guide: what `draft` writes and `build` reads, in the shape of
 // lychnion-data's package manifests (packages/<id>.json) plus the
@@ -37,8 +38,17 @@ Map<String, List<String>> defaultNotice(String publisher) => {
   ],
 };
 
+/// [url] without a user name or password in it.
+String _publicUrl(String url) {
+  final u = Uri.tryParse(url);
+  return u == null || u.userInfo.isEmpty
+      ? url
+      : u.replace(userInfo: '').toString();
+}
+
 /// Fetches [sources] (addresses or saved files) and makes a draft guide
-/// from them: one source per page, its passages in order.
+/// from them: one source per page, its passages in order. A saved file's
+/// address is left empty: the publisher fills in the page's web address.
 Future<Map<String, Object?>> makeDraft({
   required String id,
   required String publisher,
@@ -49,6 +59,13 @@ Future<Map<String, Object?>> makeDraft({
   Future<Page> Function(String source) read = readPage,
 }) async {
   if (!_id.hasMatch(id)) throw FormatException('not a valid id: $id');
+  if (!languageCode.hasMatch(language)) {
+    throw FormatException('not a language code (e.g. ja): $language');
+  }
+  if (!regionCode.hasMatch(region)) {
+    throw FormatException('not a region code (e.g. JP or JP-28): $region');
+  }
+  if (publisher.trim().isEmpty) throw const FormatException('no publisher');
   final srcs = <Map<String, Object?>>[];
   final rows = <Map<String, Object?>>[];
   for (final (i, s) in sources.indexed) {
@@ -57,11 +74,13 @@ Future<Map<String, Object?>> makeDraft({
     final PageText text = page.isHtml
         ? pageText(page.text)
         : PageText('', page.text);
+    final web =
+        page.url.startsWith('http://') || page.url.startsWith('https://');
     srcs.add({
       'id': sid,
-      'title': text.title.isNotEmpty ? text.title : page.url,
+      'title': text.title,
       'publisher': publisher,
-      'url': page.url,
+      'url': web ? _publicUrl(page.url) : '',
       // The publisher's own pages: no licence question, they decide.
       'licence': '© $publisher',
       'attribution': publisher,
@@ -90,6 +109,7 @@ String draftJson(Map<String, Object?> draft) =>
     '${const JsonEncoder.withIndent('  ').convert(draft)}\n';
 
 /// What is wrong with [draft] for building, or empty when nothing is.
+/// Checks everything the app needs to open the guide.
 List<String> draftProblems(Object? draft) {
   if (draft is! Map) return ['not a JSON object'];
   final p = <String>[];
@@ -97,15 +117,29 @@ List<String> draftProblems(Object? draft) {
   if (draft['draft'] != draftFormat) p.add('draft: must be $draftFormat');
   if (!_id.hasMatch(text('id') ?? '')) p.add('id: letters, digits, . _ -');
   if (!_version.hasMatch(text('version') ?? '')) {
-    p.add('version: dotted numbers, e.g. 2026.11.18');
+    p.add('version: dotted numbers, e.g. 2026.11.18 (or 2026.11.18.1)');
   }
   final lang = text('language') ?? '';
-  if (lang.isEmpty) p.add('language: e.g. ja');
-  final names = draft['name'];
-  if ((text('title') ?? '').trim().isEmpty &&
-      !(names is Map && names.values.any((v) => v is String && v.isNotEmpty))) {
-    p.add('title or name: what the guide is called');
+  if (!languageCode.hasMatch(lang)) p.add('language: e.g. ja');
+  if (draft['region'] != null && !regionCode.hasMatch(text('region') ?? '')) {
+    p.add('region: e.g. JP or JP-28 (upper case)');
   }
+  if ((text('title') ?? '').trim().isEmpty) {
+    p.add('title: what the guide is called');
+  }
+  for (final (k, shape) in [
+    ('name', nameShape),
+    ('notice', noticeShape),
+    ('suggestions', suggestionsShape),
+    ('synonyms', synonymsShape),
+  ]) {
+    if (draft[k] == null) continue;
+    if (shape(draft[k]) case final want?) p.add('$k: $want');
+  }
+  for (final k in ['icon', 'area', 'note', 'translation']) {
+    if (draft[k] != null && draft[k] is! String) p.add('$k: text');
+  }
+  if (draft['gaps'] != null && draft['gaps'] is! List) p.add('gaps: a list');
   final notice = draft['notice'];
   if (notice is! Map ||
       notice[lang] is! List ||
@@ -123,8 +157,24 @@ List<String> draftProblems(Object? draft) {
         continue;
       }
       if (!ids.add(s['id'] as String)) p.add('sources[$i]: id used twice');
-      for (final k in ['title', 'publisher', 'url', 'licence', 'attribution']) {
-        if (s[k] != null && s[k] is! String) p.add('sources[$i].$k: text');
+      // The app shows these with every answer from the source.
+      for (final k in ['title', 'publisher', 'licence', 'attribution']) {
+        if (s[k] is! String || (s[k] as String).trim().isEmpty) {
+          p.add('sources[$i].$k: needed');
+        }
+      }
+      final url = s['url'];
+      if (url is! String ||
+          !(url.startsWith('https://') || url.startsWith('http://'))) {
+        p.add('sources[$i].url: the page\'s web address (https://…)');
+      }
+      if (s['licence_url'] != null && s['licence_url'] is! String) {
+        p.add('sources[$i].licence_url: text');
+      }
+      if (s['region'] != null &&
+          !(s['region'] is String &&
+              regionCode.hasMatch(s['region'] as String))) {
+        p.add('sources[$i].region: e.g. JP or JP-28');
       }
     }
   }
@@ -132,6 +182,7 @@ List<String> draftProblems(Object? draft) {
   if (rows is! List || rows.isEmpty) {
     p.add('passages: at least one');
   } else {
+    final seen = <String, int>{};
     for (final (i, r) in rows.indexed) {
       if (r is! Map) {
         p.add('passages[$i]: not an object');
@@ -141,6 +192,10 @@ List<String> draftProblems(Object? draft) {
         p.add('passages[$i]: text is empty');
       } else if (r['heading'] != null && r['heading'] is! String) {
         p.add('passages[$i]: heading must be text');
+      } else if (seen[(r['text'] as String).trim()] case final j?) {
+        p.add('passages[$i]: same text as passages[$j] (delete one)');
+      } else {
+        seen[(r['text'] as String).trim()] = i;
       }
     }
   }

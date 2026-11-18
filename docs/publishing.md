@@ -8,6 +8,10 @@ pages they come from, a name and a notice. You make it from your own web
 pages, check it, sign it with your publisher key, and pass it on. Phones
 trust it because of your signature, not because of where it came from.
 
+What the tools can read today: web pages and text files. **PDFs not
+yet** (shelter lists and hazard maps are often PDFs): copy their text into
+a text file for now (see step 1).
+
 ## What makes a good guide
 
 - **One clear subject and place.** For example "Kobe: disaster
@@ -28,12 +32,23 @@ trust it because of your signature, not because of where it came from.
 
 ## Make it
 
-You need the Dart SDK (3.12 or newer) and this repository. In the
-repository folder:
+You need, once:
+
+- **Dart** 3.12 or newer: <https://dart.dev/get-dart> (macOS, Windows,
+  Linux).
+- **This repository**: on its GitHub page choose Code → Download ZIP and
+  unpack it, or `git clone https://github.com/lychnion/lychnion-studio`.
+- **Internet** for the first run: it downloads the libraries the tool
+  uses, including SQLite.
+
+Open a terminal (on Windows: PowerShell) in the repository folder and
+run once:
 
 ```bash
 dart pub get
 ```
+
+The commands below are the same on macOS and Windows.
 
 1. **Draft.** Give your id, your name and the pages:
 
@@ -42,14 +57,24 @@ dart pub get
    ```
 
    The id is yours for good: letters, digits, `.`, `_` and `-`, for
-   example your country, your city and the subject. The tool reads each
-   page, keeps its main text and splits it into passages under their
-   headings. It writes `draft.json`.
+   example your country, your city and the subject. Add `--region JP-28`
+   (your prefecture's code, here Hyogo) so the app knows where the guide
+   applies; the default is `JP`. The tool reads each page, keeps its main
+   text and splits it into passages under their headings. It writes
+   `draft.json`; an existing `draft.json` is not replaced (add `--force`
+   to replace it).
 
-   Pages must be UTF-8. For a page in Shift_JIS or EUC-JP, or one that
-   needs a browser to show its text, open it in a browser, save it as
-   text (UTF-8), and give the saved `.txt` or `.html` file instead of the
-   address. In a `.txt` file, a line starting with `## ` is a heading.
+   Pages must be UTF-8. Many Japanese city sites are in Shift_JIS or
+   EUC-JP; the tool says so. For such a page, a PDF, or a page that needs
+   a browser to show its text:
+   1. Open it in the browser, select its text and copy it.
+   2. Paste it into a text editor (Notepad on Windows, TextEdit in plain
+      text mode on macOS) and put `## ` in front of each heading.
+   3. Save it as UTF-8 text (Notepad: Save as → Encoding: UTF-8), for
+      example `hinanjo.txt`.
+   4. Give the file instead of the address: `... --publisher "Example
+      City" hinanjo.txt`. Then fill in the page's web address (`url`) in
+      the draft: people see it with every answer.
 
 2. **Review.** Open `draft.json` in a text editor and check:
    - `name` and `title`: what people see in the app.
@@ -57,7 +82,8 @@ dart pub get
    - `sources`: one per page, with its title and address.
    - `passages`: delete menus and anything out of date; fix headings.
    - `version`: today's date. Each new version must be higher than the
-     last one you published (versions only go up).
+     last one you published (versions only go up); a second one on the
+     same day is `2026.11.18.1`.
 
 3. **Build.**
 
@@ -65,13 +91,15 @@ dart pub get
    dart run bin/lychnion_studio.dart build draft.json
    ```
 
-   This writes `build/<id>.sqlite` and checks that the app can open it.
-   If something in the draft is wrong, it lists what to fix.
+   This writes `build/<id>.sqlite` and opens it as the app does. If
+   something in the draft is wrong, it lists what to fix, and a guide
+   built earlier stays as it was.
 
 4. **Sign and publish.** In the Lychnion desktop app (macOS or Windows):
    Settings → Publishers → "Publish your own".
-   - The first time, create your publisher key: a name (cannot change)
-     and the name people see.
+   - The first time, create your publisher key: a name (lower-case
+     letters, digits, `.`, `_` and `-`; it cannot change) and the name
+     people see.
    - Then "Publish a guide or map", pick `build/<id>.sqlite`, check the
      form and choose "Sign and publish". The app checks the file again,
      signs it and installs it, and a base computer passes it on to
@@ -111,5 +139,6 @@ in the app repository for how signing, versions and nodes work.
 
 ## Not yet
 
-PDFs, translation with a larger model, a desktop window for the whole
-studio, and publishing to your node from the studio.
+PDFs and pages in Shift_JIS or EUC-JP (copy their text, see step 1),
+translation with a larger model, a desktop window for the whole studio,
+and publishing to your node from the studio.

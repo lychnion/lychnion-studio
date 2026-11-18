@@ -7,10 +7,12 @@ const _usage = '''
 Turns your own web pages into a Lychnion guide.
 
   lychnion_studio draft --id ID --publisher NAME [--language ja]
-                        [--region JP] [--out draft.json] PAGE...
+                        [--region JP] [--out draft.json] [--force] PAGE...
       Reads each PAGE (an http(s) address, or a saved .html or .txt file
       in UTF-8) and writes a draft: the guide's name, notice, sources and
-      passages. Check and edit it before you build.
+      passages. Check and edit it before you build. An existing draft is
+      not replaced unless you add --force. --region: where the guide
+      applies, e.g. JP or JP-28 (Hyogo).
 
   lychnion_studio build DRAFT [--out DIR]
       Writes DIR/<id>.sqlite (default DIR: build) from the draft, and
@@ -30,6 +32,13 @@ Future<void> main(List<String> args) async {
   } on _Usage catch (e) {
     stderr.writeln('${e.message}\n\n$_usage');
     exitCode = 64;
+  } on FileSystemException catch (e) {
+    stderr.writeln('${e.path ?? ''}: ${e.osError?.message ?? e.message}');
+    exitCode = 1;
+  } on Object catch (e) {
+    // Anything else: one plain line, no stack trace.
+    stderr.writeln('Stopped: $e');
+    exitCode = 1;
   }
 }
 
@@ -43,7 +52,15 @@ Future<int> _run(List<String> args) async {
     stdout.write(_usage);
     return 0;
   }
-  final (options, rest) = _options(args.skip(1).toList());
+  final (options, flags, rest) = _options(args.skip(1).toList());
+  final allowed = switch (args.first) {
+    'draft' => {'id', 'publisher', 'language', 'region', 'out', 'force'},
+    'build' => {'out'},
+    _ => <String>{},
+  };
+  for (final o in [...options.keys, ...flags]) {
+    if (!allowed.contains(o)) throw _Usage('${args.first}: no option --$o');
+  }
   switch (args.first) {
     case 'draft':
       final id = options['id'];
@@ -67,20 +84,39 @@ Future<int> _run(List<String> args) async {
         stderr.writeln(e.message);
         return 1;
       }
-      final out = File(options['out'] ?? 'draft.json');
-      out.writeAsStringSync(draftJson(draft));
       final n = (draft['passages'] as List).length;
+      if (n == 0) {
+        stderr.writeln(
+          'No passages found: the pages may need a browser to show their '
+          'text. Copy the text into a UTF-8 text file and give that file '
+          'instead (see docs/publishing.md). Nothing was written.',
+        );
+        return 1;
+      }
+      final out = File(options['out'] ?? 'draft.json');
+      if (out.existsSync() && !flags.contains('force')) {
+        stderr.writeln(
+          '${out.path} exists (maybe already reviewed): not replaced. Use '
+          'another --out, or add --force to replace it.',
+        );
+        return 1;
+      }
+      // Written next to it first: a cut write never leaves half a draft.
+      final tmp = File('${out.path}.new')..writeAsStringSync(draftJson(draft));
+      tmp.renameSync(out.path);
+      final missing = (draft['sources'] as List).cast<Map>().where(
+        (s) => (s['url'] as String).isEmpty,
+      );
       stdout.writeln(
         'wrote ${out.path}: ${(draft['sources'] as List).length} pages, '
         '$n passages. Check the name, the notice and every passage, then '
         'build it.',
       );
-      if (n == 0) {
-        stderr.writeln(
-          'No passages found: the pages may need a browser to show their '
-          'text. Save them as text and give the files instead.',
+      if (missing.isNotEmpty) {
+        stdout.writeln(
+          'Fill in the web address ("url") of: '
+          '${missing.map((s) => s['id']).join(', ')} (pages given as files).',
         );
-        return 1;
       }
       return 0;
     case 'build':
@@ -135,21 +171,39 @@ Future<int> _run(List<String> args) async {
   }
 }
 
-/// `--name value` options, and the other arguments in order.
-(Map<String, String>, List<String>) _options(List<String> args) {
+/// `--name value` (or `--name=value`) options, `--force`, and the other
+/// arguments in order.
+(Map<String, String>, Set<String>, List<String>) _options(List<String> args) {
   const known = {'id', 'publisher', 'language', 'region', 'out'};
+  const switches = {'force'};
   final options = <String, String>{};
+  final flags = <String>{};
   final rest = <String>[];
   for (var i = 0; i < args.length; i++) {
     final a = args[i];
-    if (a.startsWith('--')) {
-      final name = a.substring(2);
-      if (!known.contains(name)) throw _Usage('unknown option: $a');
-      if (i + 1 >= args.length) throw _Usage('$a needs a value');
+    if (a == '--') {
+      rest.addAll(args.skip(i + 1));
+      break;
+    }
+    if (!a.startsWith('--')) {
+      rest.add(a);
+      continue;
+    }
+    final eq = a.indexOf('=');
+    final name = a.substring(2, eq < 0 ? a.length : eq);
+    if (switches.contains(name) && eq < 0) {
+      flags.add(name);
+      continue;
+    }
+    if (!known.contains(name)) throw _Usage('unknown option: $a');
+    if (options.containsKey(name)) throw _Usage('--$name given twice');
+    if (eq >= 0) {
+      options[name] = a.substring(eq + 1);
+    } else if (i + 1 < args.length) {
       options[name] = args[++i];
     } else {
-      rest.add(a);
+      throw _Usage('$a needs a value');
     }
   }
-  return (options, rest);
+  return (options, flags, rest);
 }
