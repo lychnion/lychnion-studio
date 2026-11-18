@@ -99,7 +99,7 @@ The commands below are the same on macOS and Windows.
    Settings → Publishers → "Publish your own".
    - The first time, create your publisher key: a name (lower-case
      letters, digits, `.`, `_` and `-`; it cannot change) and the name
-     people see.
+     people see. Then save a key backup at once (see "Your key").
    - Then "Publish a guide or map", pick `build/<id>.sqlite`, check the
      form and choose "Sign and publish". The app checks the file again,
      signs it and installs it, and a base computer passes it on to
@@ -177,8 +177,9 @@ phones until they get the statement, and until then they show guides
 signed by your new key as having a bad signature. Get it to them right
 away, every way you publish:
 
-- **A base** (the desktop app on the shelter Wi-Fi) passes the
-  statements on to phones by itself.
+- **A base** (the desktop app on the shelter Wi-Fi) that has the
+  statements passes them on to phones by itself: the computer that made
+  them does, others once they got them (catalog or stick).
 - **A USB stick** made in the desktop app carries them.
 - **Your catalog on the internet:** `publisher/keys.json` in the
   desktop app's folder (it holds no private key) has a `keys` list. Put
@@ -196,6 +197,11 @@ away, every way you publish:
     "keys": [ … the list from keys.json … ]
   }
   ```
+
+After a revocation, also publish your guides again: the app signed the
+newest version of each with the new key and keeps those records in
+`publisher/records/`. Records of the revoked key are no longer used, so
+a catalog that still lists only those shows nothing.
 
 Phones also keep a copy of your catalog they fetched earlier, so the
 statements stay with them offline.
