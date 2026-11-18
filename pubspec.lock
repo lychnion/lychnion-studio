@@ -197,8 +197,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/lychnion_guide"
-      ref: e713592b7ed2e0da0aa7ef4e7c1426bf51b78f04
-      resolved-ref: e713592b7ed2e0da0aa7ef4e7c1426bf51b78f04
+      ref: be565e8aeb473ee036b169dc11a010ba65437b82
+      resolved-ref: be565e8aeb473ee036b169dc11a010ba65437b82
       url: "https://github.com/lychnion/lychnion.git"
     source: git
     version: "1.0.0"

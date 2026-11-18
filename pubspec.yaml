@@ -18,7 +18,7 @@ dependencies:
     git:
       url: https://github.com/lychnion/lychnion.git
       path: packages/lychnion_guide
-      ref: e713592b7ed2e0da0aa7ef4e7c1426bf51b78f04 # lychnion/lychnion#55
+      ref: be565e8aeb473ee036b169dc11a010ba65437b82 # lychnion/lychnion main
 
 dev_dependencies:
   sqlite3: ^3.9.1
