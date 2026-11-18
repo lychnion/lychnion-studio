@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'extract.dart';
 import 'fetch.dart';
-import 'shapes.dart';
+import 'package:lychnion_guide/lychnion_guide.dart';
 
 // A draft guide: what `draft` writes and `build` reads, in the shape of
 // lychnion-data's package manifests (packages/<id>.json) plus the
