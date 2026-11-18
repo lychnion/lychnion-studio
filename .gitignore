@@ -3,3 +3,5 @@ build/
 # Guides and drafts made while trying the tool.
 *.sqlite
 draft.json
+# Half-built guides left by a build that was stopped.
+*.building

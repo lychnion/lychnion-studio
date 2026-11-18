@@ -12,8 +12,15 @@ environment:
 
 dependencies:
   html: ^0.15.7
-  sqlite3: ^3.5.2
+  # The guide tables and the app's check, shared with the app. Pinned to a
+  # commit: move it on purpose (see README).
+  lychnion_guide:
+    git:
+      url: https://github.com/lychnion/lychnion.git
+      path: packages/lychnion_guide
+      ref: be565e8aeb473ee036b169dc11a010ba65437b82 # lychnion/lychnion main
 
 dev_dependencies:
+  sqlite3: ^3.9.1
   lints: ^6.0.0
   test: ^1.25.0

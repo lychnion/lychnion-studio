@@ -306,7 +306,11 @@ void main() {
         ),
         hasLength(1),
       );
-      expect(File('${file.path}.building').existsSync(), isFalse);
+      // No half-built file left next to it (its name has a pid and time).
+      expect(
+        file.parent.listSync().where((e) => e.path.endsWith('.building')),
+        isEmpty,
+      );
     });
 
     test('what the app cannot use is named', () async {
