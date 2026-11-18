@@ -164,25 +164,41 @@ it. Then:
 your newest backup, uses the ready-made revocation in the file; it needs
 no passphrase and cannot be undone. (An older backup holds an older key;
 revoking it also cuts off the keys that replaced it.) You then have no
-key: create a new one in "Publish your own", save a backup and show its
-QR code again, as above. With no backup at all you can neither revoke
+key: put the revocation into your catalog (the app saves it in
+`publisher/keys.json`; see "Tell phones about it"), then create a new
+key in "Publish your own", save a backup and show its QR code again, as
+above. With no backup at all you can neither revoke
 nor replace the key: whoever has the computer can sign in your name
 until people remove your publisher, so ask them to remove it and add
 your new one.
 
 **Tell phones about it.** A replacement or a revocation does nothing on
-phones until they get the statement. After either one, before you
-publish anything signed with the new key:
+phones until they get the statement, and until then they show guides
+signed by your new key as having a bad signature. Get it to them right
+away, every way you publish:
 
-1. Open `publisher/keys.json` in the desktop app's folder (it holds no
-   private key).
-2. Copy its whole `keys` list into the `catalog.json` you publish, each
-   time: the earlier statements must stay there too.
-3. Publish the catalog.
+- **A base** (the desktop app on the shelter Wi-Fi) passes the
+  statements on to phones by itself.
+- **A USB stick** made in the desktop app carries them.
+- **Your catalog on the internet:** `publisher/keys.json` in the
+  desktop app's folder (it holds no private key) has a `keys` list. Put
+  that whole list into the `catalog.json` you publish, in place of any
+  `keys` list there (it already holds your earlier statements), and keep
+  the file valid JSON. For a headless node, lychnion-data's
+  `tool/records.dart catalog … --keys publisher/keys.json` does it for
+  you. A catalog looks like this:
 
-Phones learn it from your catalog, also from a copy they fetched
-earlier, and from USB sticks made in the desktop app. Do not count on
-anything else to pass it on: put it in your own catalog.
+  ```json
+  {
+    "format": 2,
+    "records": [ … ],
+    "urls": { … },
+    "keys": [ … the list from keys.json … ]
+  }
+  ```
+
+Phones also keep a copy of your catalog they fetched earlier, so the
+statements stay with them offline.
 
 Older versions of the app do not know about replaced or revoked keys:
 they show guides signed by your new key as having a bad signature, and
