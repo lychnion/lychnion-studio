@@ -503,4 +503,48 @@ void main() {
       );
     });
   });
+
+  group('second review', () {
+    test('the end of a long paragraph is kept', () {
+      final line = '${'安全な場所に避難してください。' * 28}川には絶対に近づかないでください。';
+      final ps = passages([line]);
+      expect(ps.map((p) => p.text).join(), contains('川には絶対に近づかないでください。'));
+    });
+
+    test('a short last line of a section is kept, a lone one is not', () {
+      final ps = passages(['## 避難', 'あ' * 410, '川に近づかない。', '## メニュー', '短い']);
+      expect(ps.single.text, endsWith('\n川に近づかない。'));
+    });
+
+    test('deeply nested headings and many articles are fine', () {
+      final heading = '<h1>${'<span>' * 20000}見出し${'</span>' * 20000}</h1>';
+      expect(pageText('<body>$heading<p>本文</p></body>').title, '見出し');
+      final articles =
+          '${'<article>' * 5000}'
+          '<p>入れ子の記事の中の本文です。避難所を確認してください。</p>'
+          '${'</article>' * 5000}';
+      final sw = Stopwatch()..start();
+      expect(_passagesOf('<body>$articles</body>'), hasLength(1));
+      expect(sw.elapsed, lessThan(const Duration(seconds: 5)));
+    });
+
+    test('vectors without passage_id are refused', () {
+      final f = File('${tmp.path}/v.sqlite');
+      sqlite3.open(f.path)
+        ..execute('''
+          CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+          INSERT INTO meta VALUES('id', 'x'), ('version', '1');
+          CREATE TABLE sources(id TEXT PRIMARY KEY, title TEXT, publisher TEXT,
+            url TEXT, licence TEXT, attribution TEXT);
+          INSERT INTO sources VALUES('s1', 't', 'p', 'https://x', 'l', 'a');
+          CREATE TABLE passages(id INTEGER PRIMARY KEY, source_id TEXT,
+            heading TEXT, text TEXT);
+          INSERT INTO passages VALUES(1, 's1', 'h', 'text');
+          CREATE TABLE alerts(id TEXT, source_id TEXT, text TEXT, match_all TEXT);
+          CREATE TABLE vectors(model TEXT, vec BLOB);
+          INSERT INTO vectors VALUES('m', x'00');''')
+        ..close();
+      expect(() => checkGuide(f.path), throwsA(isA<GuideProblem>()));
+    });
+  });
 }

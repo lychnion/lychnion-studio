@@ -123,7 +123,10 @@ GuideSummary checkGuide(String path) {
       }
     }
     if (has('vectors')) {
-      for (final r in db.select('SELECT model, vec FROM vectors')) {
+      // The app's own query (needs passage_id).
+      for (final r in db.select(
+        'SELECT model, vec FROM vectors ORDER BY model, passage_id',
+      )) {
         if (r['model'] is! String || r['vec'] is! Uint8List) {
           throw const GuideProblem('vectors: a row is incomplete');
         }

@@ -57,7 +57,8 @@ class PageText {
 PageText pageText(String source) {
   final doc = html.parse(source);
   final body = doc.body;
-  final all = body == null ? 0 : _textSize(body);
+  final sizes = _textSizes(doc.documentElement);
+  final all = sizes[body] ?? 0;
   Element? root = body;
   var size = 0;
   for (final e in _all(
@@ -67,7 +68,7 @@ PageText pageText(String source) {
         e.localName == 'article' ||
         e.attributes['role'] == 'main',
   )) {
-    final n = _textSize(e);
+    final n = sizes[e] ?? 0;
     if (n > size) (root, size) = (e, n);
   }
   // A small "main" (a card, a teaser) would leave most of the page out.
@@ -87,19 +88,38 @@ PageText pageText(String source) {
 
 /// How much text [e] holds, without spaces. A loop, not recursion (the
 /// html package's `text` recurses and overflows on deeply nested pages).
-/// Only text people read counts: scripts, menus and hidden parts do not.
-int _textSize(Element e) {
-  var n = 0;
-  final stack = <Node>[e];
+/// How much text each element holds, without spaces, in one pass from
+/// the leaves up. Only text people read counts: scripts, menus and hidden
+/// parts do not.
+Map<Element, int> _textSizes(Element? root) {
+  final sizes = <Element, int>{};
+  if (root == null) return sizes;
+  // Each element twice: first to add its children, then (done) to sum.
+  final stack = <(Element, bool)>[(root, false)];
   while (stack.isNotEmpty) {
-    final node = stack.removeLast();
-    if (node is Text) {
-      n += node.data.replaceAll(RegExp(r'\s+'), '').length;
-    } else if (node is! Element || !_pruned(node)) {
-      stack.addAll(node.nodes);
+    final (e, done) = stack.removeLast();
+    if (_pruned(e)) {
+      sizes[e] = 0;
+      continue;
     }
+    if (!done) {
+      stack.add((e, true));
+      for (final c in e.children) {
+        stack.add((c, false));
+      }
+      continue;
+    }
+    var n = 0;
+    for (final node in e.nodes) {
+      if (node is Text) {
+        n += node.data.replaceAll(RegExp(r'\s+'), '').length;
+      } else if (node is Element) {
+        n += sizes[node] ?? 0;
+      }
+    }
+    sizes[e] = n;
   }
-  return n;
+  return sizes;
 }
 
 /// Never read, with everything inside it.
@@ -125,10 +145,21 @@ List<Element> _all(
   return out;
 }
 
-/// The text of a small element (a title or a heading).
+/// The text of a small element (a title or a heading), at most about
+/// 1,000 characters; read in a loop, skipping hidden parts.
 String _shortText(Element? e) {
-  if (e == null || _textSize(e) > 1000) return '';
-  return _oneLine(e.text);
+  if (e == null) return '';
+  final out = StringBuffer();
+  final stack = <Node>[e];
+  while (stack.isNotEmpty && out.length < 1000) {
+    final node = stack.removeLast();
+    if (node is Text) {
+      out.write(node.data);
+    } else if (node is Element && (identical(node, e) || !_pruned(node))) {
+      stack.addAll(node.nodes.reversed);
+    }
+  }
+  return _oneLine(out.toString());
 }
 
 bool _hidden(Element e) =>
@@ -245,8 +276,20 @@ List<Passage> passages(List<String> lines, {int maxChars = maxPassageChars}) {
     }
   }
   flush();
-  return [
-    for (final p in out)
-      if (p.text.runes.length >= minPassageChars) p,
-  ];
+  // A short passage right after another under the same heading (the end
+  // of a long paragraph, the last line of a section) joins it, so its
+  // instruction is not lost; other short passages (menus, captions) go.
+  final kept = <Passage>[];
+  int? previous; // index in [out] of the passage kept last
+  for (final (i, p) in out.indexed) {
+    if (p.text.runes.length >= minPassageChars) {
+      kept.add(p);
+      previous = i;
+    } else if (previous == i - 1 && kept.last.heading == p.heading) {
+      final last = kept.removeLast();
+      kept.add((heading: last.heading, text: '${last.text}\n${p.text}'));
+      previous = i;
+    }
+  }
+  return kept;
 }
