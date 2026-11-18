@@ -1,0 +1,5 @@
+.dart_tool/
+build/
+# Guides and drafts made while trying the tool.
+*.sqlite
+draft.json
