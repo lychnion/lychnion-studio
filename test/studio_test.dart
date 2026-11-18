@@ -415,4 +415,92 @@ void main() {
     expect(r.exitCode, 1);
     expect(r.stderr, isNot(contains('#0')));
   });
+
+  group('review fixes', () {
+    test('notices name 119 and 110 only for Japan', () {
+      expect(
+        defaultNotice('City', region: 'US')['en']!.join(),
+        isNot(contains('119')),
+      );
+      expect(
+        defaultNotice('City', region: 'JP-28')['ja']!.join(),
+        contains('119'),
+      );
+    });
+
+    test('scripts and menus do not decide the main part', () {
+      final text = List.filled(
+        5,
+        '<p>給水所は市役所の駐車場です。ポリタンクを持ってきてください。</p>',
+      ).join();
+      final ps = _passagesOf(
+        '<body><nav><article>${'メニュー' * 500}</article></nav>'
+        '<article><script>${'x' * 100000}</script><h2>給水</h2>$text</article>'
+        '<aside>${'関係のない横の欄の文章です。' * 3}</aside></body>',
+      );
+      expect(ps.single.heading, '給水');
+      expect(ps.single.text, isNot(contains('関係のない')));
+    });
+
+    test('a very long line is split quickly', () {
+      final long = '避難所の場所を確認してください。' * 20000; // 320,000 characters
+      final sw = Stopwatch()..start();
+      final ps = passages([long]);
+      expect(sw.elapsed, lessThan(const Duration(seconds: 2)));
+      expect(ps.length, greaterThan(700));
+    });
+
+    test('source ids are unique beyond the guide', () async {
+      final f = File('${tmp.path}/page.html')..writeAsStringSync(_page);
+      final d = await makeDraft(id: 'jp.a', publisher: 'p', sources: [f.path]);
+      expect(((d['sources'] as List).single as Map)['id'], 'jp.a/s1');
+      expect(((d['passages'] as List).first as Map)['source'], 'jp.a/s1');
+    });
+
+    test('check reads what the app reads', () {
+      var n = 0;
+      String problem(String extra) {
+        final f = File('${tmp.path}/g${n++}.sqlite');
+        final db = sqlite3.open(f.path)
+          ..execute('''
+            CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            INSERT INTO meta VALUES('id', 'x'), ('version', '1');
+            CREATE TABLE sources(id TEXT PRIMARY KEY, title TEXT, publisher TEXT,
+              url TEXT, licence TEXT, attribution TEXT, region TEXT);
+            INSERT INTO sources VALUES('s1', 't', 'p', 'https://x', 'l', 'a', 'JP');
+            CREATE TABLE passages(id INTEGER PRIMARY KEY, source_id TEXT,
+              heading TEXT, text TEXT, original_heading TEXT, original TEXT);
+            INSERT INTO passages VALUES(1, 's1', 'h', 'text', NULL, NULL);
+            CREATE TABLE alerts(id TEXT, source_id TEXT, text TEXT, match_all TEXT);
+            $extra''');
+        db.close();
+        try {
+          checkGuide(f.path);
+          return 'ok';
+        } on GuideProblem catch (e) {
+          return e.message;
+        }
+      }
+
+      expect(problem(''), 'ok');
+      expect(problem("UPDATE sources SET region = x'01';"), contains('region'));
+      expect(
+        problem("UPDATE passages SET original = x'01';"),
+        contains('original'),
+      );
+      expect(
+        problem('''CREATE TABLE passage_texts(passage_id INTEGER, lang TEXT,
+          heading TEXT, text TEXT);
+          INSERT INTO passage_texts VALUES(1, 'en', NULL, NULL);'''),
+        contains('passage_texts'),
+      );
+      expect(
+        problem(
+          '''CREATE TABLE vectors(model TEXT, passage_id INTEGER, vec BLOB);
+          INSERT INTO vectors VALUES('m', 1, 'text');''',
+        ),
+        contains('vectors'),
+      );
+    });
+  });
 }

@@ -75,7 +75,11 @@ PageText pageText(String source) {
   final out = StringBuffer();
   if (root != null) _walk(root, out, page: identical(root, body));
   final title = _shortText(
-    _all(doc.documentElement, (e) => e.localName == 'title').firstOrNull,
+    _all(
+      doc.documentElement,
+      (e) => e.localName == 'title',
+      all: true,
+    ).firstOrNull,
   );
   final h1 = _shortText(_all(root, (e) => e.localName == 'h1').firstOrNull);
   return PageText(title.isNotEmpty ? title : h1, out.toString());
@@ -83,6 +87,7 @@ PageText pageText(String source) {
 
 /// How much text [e] holds, without spaces. A loop, not recursion (the
 /// html package's `text` recurses and overflows on deeply nested pages).
+/// Only text people read counts: scripts, menus and hidden parts do not.
 int _textSize(Element e) {
   var n = 0;
   final stack = <Node>[e];
@@ -90,21 +95,30 @@ int _textSize(Element e) {
     final node = stack.removeLast();
     if (node is Text) {
       n += node.data.replaceAll(RegExp(r'\s+'), '').length;
-    } else {
+    } else if (node is! Element || !_pruned(node)) {
       stack.addAll(node.nodes);
     }
   }
   return n;
 }
 
+/// Never read, with everything inside it.
+bool _pruned(Element e) => _skip.contains(e.localName) || _hidden(e);
+
 /// The elements under [root] (and [root]) that [test] picks, in page
-/// order. A loop, not recursion, like [_textSize].
-List<Element> _all(Element? root, bool Function(Element) test) {
+/// order, not inside skipped or hidden parts unless [all]. A loop, not
+/// recursion, like [_textSize].
+List<Element> _all(
+  Element? root,
+  bool Function(Element) test, {
+  bool all = false,
+}) {
   final out = <Element>[];
   if (root == null) return out;
   final stack = <Element>[root];
   while (stack.isNotEmpty) {
     final e = stack.removeLast();
+    if (!all && _pruned(e)) continue;
     if (test(e)) out.add(e);
     stack.addAll(e.children.reversed);
   }
@@ -179,16 +193,30 @@ typedef Passage = ({String heading, String text});
 /// [line] cut at sentence ends into pieces of up to [max] characters
 /// (a piece without a sentence end in reach is cut at [max]).
 List<String> _pieces(String line, int max) {
+  final chars = line.runes.toList();
+  if (chars.length <= max) return [line];
+  const ends = {0x3002, 0xff01, 0xff1f, 0x21, 0x3f}; // 。！？!?
   final out = <String>[];
-  var rest = line;
-  while (rest.runes.length > max) {
-    final head = String.fromCharCodes(rest.runes.take(max));
-    final cut = head.lastIndexOf(RegExp(r'[。！？!?]|\. '));
-    final end = cut > 0 ? cut + 1 : head.length;
-    out.add(rest.substring(0, end).trim());
-    rest = rest.substring(end).trim();
+  var start = 0;
+  while (start < chars.length) {
+    var end = start + max;
+    if (end >= chars.length) {
+      end = chars.length;
+    } else {
+      // The last sentence end in this window (only the window is read).
+      for (var i = end - 1; i > start; i--) {
+        final c = chars[i];
+        if (ends.contains(c) ||
+            (c == 0x2e && i + 1 < chars.length && chars[i + 1] == 0x20)) {
+          end = i + 1;
+          break;
+        }
+      }
+    }
+    final piece = String.fromCharCodes(chars, start, end).trim();
+    if (piece.isNotEmpty) out.add(piece);
+    start = end;
   }
-  if (rest.isNotEmpty) out.add(rest);
   return out;
 }
 

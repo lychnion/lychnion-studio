@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:sqlite3/sqlite3.dart';
 
@@ -65,9 +66,8 @@ GuideSummary checkGuide(String path) {
       if (shape(v) case final want?) throw GuideProblem('meta $k: not $want');
     }
     final sources = <String>{};
-    for (final r in db.select(
-      'SELECT id, title, publisher, url, licence, attribution FROM sources',
-    )) {
+    // All columns: the app reads the optional ones (region) when there.
+    for (final r in db.select('SELECT * FROM sources')) {
       for (final k in [
         'id',
         'title',
@@ -78,12 +78,23 @@ GuideSummary checkGuide(String path) {
       ]) {
         if (r[k] is! String) throw GuideProblem('source ${r['id']}: no $k');
       }
+      if (r.containsKey('region') &&
+          r['region'] != null &&
+          r['region'] is! String) {
+        throw GuideProblem('source ${r['id']}: region is not text');
+      }
       sources.add(r['id'] as String);
     }
     var count = 0;
-    for (final r in db.select(
-      'SELECT id, source_id, heading, text FROM passages ORDER BY id',
-    )) {
+    for (final r in db.select('SELECT * FROM passages ORDER BY id')) {
+      if (r['id'] is! int) {
+        throw GuideProblem('passage ${r['id']}: id is not a number');
+      }
+      for (final k in ['original', 'original_heading']) {
+        if (r.containsKey(k) && r[k] != null && r[k] is! String) {
+          throw GuideProblem('passage ${r['id']}: $k is not text');
+        }
+      }
       if (!sources.contains(r['source_id'])) {
         throw GuideProblem('passage ${r['id']}: its source is missing');
       }
@@ -96,6 +107,28 @@ GuideSummary checkGuide(String path) {
       count++;
     }
     if (count == 0) throw const GuideProblem('no passages');
+    bool has(String table) => db.select(
+      'SELECT 1 FROM sqlite_master WHERE name = ?',
+      [table],
+    ).isNotEmpty;
+    // Optional tables, read whole by the app when they are there.
+    if (has('passage_texts')) {
+      for (final r in db.select('SELECT * FROM passage_texts')) {
+        if (r['passage_id'] is! int ||
+            r['lang'] is! String ||
+            r['text'] is! String ||
+            (r['heading'] != null && r['heading'] is! String)) {
+          throw const GuideProblem('passage_texts: a row is incomplete');
+        }
+      }
+    }
+    if (has('vectors')) {
+      for (final r in db.select('SELECT model, vec FROM vectors')) {
+        if (r['model'] is! String || r['vec'] is! Uint8List) {
+          throw const GuideProblem('vectors: a row is incomplete');
+        }
+      }
+    }
     for (final r in db.select('SELECT * FROM alerts')) {
       if (!sources.contains(r['source_id'])) {
         throw GuideProblem('alert ${r['id']}: its source is missing');

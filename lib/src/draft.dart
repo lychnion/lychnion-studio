@@ -25,18 +25,25 @@ String todayVersion([DateTime? now]) {
 }
 
 /// The notice shown before people rely on the guide, per language. The
-/// publisher should check it says what the guide is not for.
-Map<String, List<String>> defaultNotice(String publisher) => {
-  'ja': [
-    'この情報は$publisherが公開したものです。最新の情報は$publisherの発表を確認してください。',
-    '緊急のときは119番・110番に電話してください。',
-  ],
-  'en': [
-    'Published by $publisher. Check $publisher\'s own announcements for the '
-        'latest information.',
-    'In an emergency, call 119 (fire, ambulance) or 110 (police).',
-  ],
-};
+/// publisher should check it says what the guide is not for. Emergency
+/// numbers only for Japan (119, 110); elsewhere the publisher adds its own.
+Map<String, List<String>> defaultNotice(
+  String publisher, {
+  String region = 'JP',
+}) {
+  final japan = region == 'JP' || region.startsWith('JP-');
+  return {
+    'ja': [
+      'この情報は$publisherが公開したものです。最新の情報は$publisherの発表を確認してください。',
+      if (japan) '緊急のときは119番・110番に電話してください。',
+    ],
+    'en': [
+      'Published by $publisher. Check $publisher\'s own announcements for the '
+          'latest information.',
+      if (japan) 'In an emergency, call 119 (fire, ambulance) or 110 (police).',
+    ],
+  };
+}
 
 /// [url] without a user name or password in it.
 String _publicUrl(String url) {
@@ -70,7 +77,8 @@ Future<Map<String, Object?>> makeDraft({
   final rows = <Map<String, Object?>>[];
   for (final (i, s) in sources.indexed) {
     final page = await read(s);
-    final sid = 's${i + 1}';
+    // Unique beyond this guide: the app merges the sources of all guides.
+    final sid = '$id/s${i + 1}';
     final PageText text = page.isHtml
         ? pageText(page.text)
         : PageText('', page.text);
@@ -89,7 +97,7 @@ Future<Map<String, Object?>> makeDraft({
       rows.add({'source': sid, 'heading': p.heading, 'text': p.text});
     }
   }
-  final notice = defaultNotice(publisher);
+  final notice = defaultNotice(publisher, region: region);
   return {
     'draft': draftFormat,
     'id': id,
