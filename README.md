@@ -29,7 +29,8 @@ and the check come from `lychnion_guide` in
 [lychnion/lychnion](https://github.com/lychnion/lychnion/tree/main/packages/lychnion_guide),
 the package the app uses, so a guide that passes `check` here passes in
 the app. `pubspec.yaml` pins it to a commit (`ref`); to move it, set a
-newer commit and run `dart pub upgrade lychnion_guide`. Pure Dart, no
+newer commit on the app's `main` (never a PR branch: it may disappear)
+and run `dart pub upgrade lychnion_guide`. Pure Dart, no
 Flutter.
 
 Not yet: PDFs and pages in Shift_JIS or EUC-JP (copy their text into a
