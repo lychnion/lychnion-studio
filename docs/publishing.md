@@ -118,41 +118,64 @@ screen shows where. It signs everything you publish.
   website, at the shelter.
 
 **Back it up.** In "Publish your own", "Save a key backup" writes a file
-`<name>.lychnion-key`, protected by a passphrase (at least 12
-characters). Keep the file offline (1Password, or a USB stick in a safe),
-never on a server, in a repository or on a stick you hand out. Keep the
-passphrase apart from the file. A forgotten passphrase cannot be
-recovered, and whoever has the file can revoke your key with it, even
-without the passphrase.
+`<name>.lychnion-key`, protected by a passphrase of at least 12
+characters: choose several unrelated words, it is the only protection if
+the file leaks. Keep the file offline (a password manager, or a USB stick
+in a safe), never on a server, in a repository or on a stick you hand
+out, and keep the passphrase apart from it. A forgotten passphrase cannot
+be recovered. Without the passphrase a leaked file cannot sign in your
+name, but it can switch your key off (revoke it).
 
-**New computer.** "Restore from a backup" on a computer that has no key
-yet. A backup of a key you replaced or revoked is refused.
+**New computer.** "Restore from a backup" works only on a computer that
+has no key yet; it never replaces a key. A wrong passphrase or a damaged
+file is refused and nothing is written. Restore your newest backup only:
+a backup of a key you have replaced since must not be used again.
 
-**Replace the key** while you still have it ("Replace the key"): the app
-makes a new key and signs it with the old one. Phones that trust your
-old key accept the new one when they next get your catalog or a USB
-stick from you. What you signed before stays valid. Then make a new
-backup, and keep the old one safe too: it holds the old key's
-revocation, in case the old key is ever stolen.
+**Replace or revoke?** Replace when you still have the key and nobody
+else does, for example to retire an old key. If the key may have been
+stolen, revoke it; replacing a stolen key does not stop the thief.
+
+**Replace the key** ("Replace the key"): the app makes a new key and
+signs it with the old one. Phones that trust your old key accept the new
+one once they get the statement from you (see "Tell phones about it"
+below). What you signed before stays valid. Then save a new key backup,
+and keep the old backup as safely as the new one: anyone who gets the
+old key or its backup can switch it off, and phones that only know the
+old key would then lose your new key too.
 
 **If the key was stolen**, or may have been ("Revoke the key"): phones
-stop trusting it and everything it signed, and the app makes a new key
-and signs your packages again with it. People have to add your new QR
-code or link, so show it again in the same places as before. Nothing
-signed by a stolen key can prove that a new key is yours.
+stop trusting the key and everything it signed. The app makes a new key
+and signs the newest version of each of your guides again with it. Then:
+
+1. Save a new key backup.
+2. Show your new QR code or link again, in the same places as before.
+   Phones cannot tell you from the thief, so each person decides by
+   adding your new code. Until then your publisher shows as revoked
+   there, and your old code is refused.
 
 **If you lost the computer:** "Revoke a lost key from a backup" uses the
-revocation in the backup file; it needs no passphrase.
+ready-made revocation in the backup file; it needs no passphrase. You
+then have no key: create a new one in "Publish your own", save a backup
+and show its QR code again. With no backup at all you can neither revoke
+nor replace the key, and phones keep trusting it: ask people to remove
+your publisher and add your new one.
 
-**Tell phones about it.** After a replacement or a revocation the app
-writes `publisher/keys.json` (no private key in it). Put its `keys` list
-into the `catalog.json` you publish, and keep it there: phones learn
-about your new or revoked key from your catalog, also from a copy they
-fetched earlier. USB sticks made in the desktop app carry the statements
-already. A base and the headless node do not pass them on yet.
+**Tell phones about it.** A replacement or a revocation does nothing on
+phones until they get the statement. After either one:
+
+1. Open `publisher/keys.json` in the desktop app's folder (it holds no
+   private key).
+2. Copy its `keys` list into the `catalog.json` you publish, and keep it
+   there from then on.
+3. Publish the catalog.
+
+Phones learn it from your catalog, also from a copy they fetched
+earlier, from USB sticks made in the desktop app, and from a base or the
+headless node that has it.
 
 Older versions of the app do not know about replaced or revoked keys:
-ask people to update.
+they show guides signed by your new key as having a bad signature, and
+they keep trusting a revoked key. Ask people to update.
 
 ## Getting it to people
 
