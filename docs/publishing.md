@@ -111,7 +111,11 @@ The key is in the desktop app's folder (`publisher/publisher.json`); the
 screen shows where. It signs everything you publish.
 
 - **Never share it** or put it on a web server. If someone else gets it,
-  they can sign guides in your name.
+  they can sign guides in your name: see "If the key was stolen" below.
+- The key file is not encrypted on the computer: turn on full-disk
+  encryption (FileVault, BitLocker), and keep the app's folder out of
+  cloud sync (iCloud, OneDrive, Dropbox). A backup tool such as Time
+  Machine copies it too: keep those backups as safe as the key.
 - People add your publisher once, from your QR code or link
   (`lychnion://publisher?…`), shown in "Publish your own". Show it where
   people can see it is really yours: at your office, on your official
@@ -148,14 +152,18 @@ old key or its backup can switch it off, and phones that only know the
 old key would then lose your new key too.
 
 **If the key was stolen**, or may have been ("Revoke the key"): phones
-stop trusting the key and everything it signed. The app makes a new key
+stop trusting the key and everything it signed once they get the
+statement. The app makes a new key
 and signs the newest version of each of your guides and maps again with
 it. Then:
 
 1. Put the statement into your catalog (see "Tell phones about it").
 2. Save a new key backup.
-3. Show your new QR code or link again, only in person or on your
-   official website, where people can see it is really yours. Phones
+3. Take down your old QR code and link everywhere (posters, website,
+   emails): a phone that adds the old one trusts the stolen key until
+   the statement reaches it.
+4. Show your new QR code or link, only in person or on your official
+   website, where people can see it is really yours. Phones
    cannot tell you from the thief, so each person decides by adding
    your new code. Until then your publisher shows as revoked there, and
    your old code is refused.
@@ -182,10 +190,11 @@ away, every way you publish:
   them does, others once they got them (catalog or stick).
 - **A USB stick** made in the desktop app carries them.
 - **Your catalog on the internet:** `publisher/keys.json` in the
-  desktop app's folder (it holds no private key) has a `keys` list. Put
-  that whole list into the `catalog.json` you publish, in place of any
-  `keys` list there (it already holds your earlier statements), and keep
-  the file valid JSON. For a headless node, lychnion-data's
+  desktop app's folder (it holds no private key) has a `keys` list. Add
+  every statement in it to the `keys` list of the `catalog.json` you
+  publish, and never remove statements already there: a computer
+  restored from a backup only knows its own new statements. Keep the
+  file valid JSON. For a headless node, lychnion-data's
   `tool/records.dart catalog … --keys publisher/keys.json` does it for
   you. A catalog looks like this:
 
