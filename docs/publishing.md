@@ -120,9 +120,12 @@ screen shows where. It signs everything you publish.
 **Back it up.** In "Publish your own", "Save a key backup" writes a file
 `<name>.lychnion-key`, protected by a passphrase of at least 12
 characters: choose several unrelated words, it is the only protection if
-the file leaks. Keep the file offline (a password manager, or a USB stick
-in a safe), never on a server, in a repository or on a stick you hand
-out, and keep the passphrase apart from it. A forgotten passphrase cannot
+the file leaks. Keep the file offline (a USB stick in a safe, or a
+password manager), never on a server, in a repository or on a stick you
+hand out. Keep the passphrase somewhere else (on paper in another safe,
+or with another person), never next to the file or in the same password
+manager. `publisher/publisher.json` is the live key without a
+passphrase: never copy it as a backup. A forgotten passphrase cannot
 be recovered. Without the passphrase a leaked file cannot sign in your
 name, but it can switch your key off (revoke it).
 
@@ -132,8 +135,9 @@ file is refused and nothing is written. Restore your newest backup only:
 a backup of a key you have replaced since must not be used again.
 
 **Replace or revoke?** Replace when you still have the key and nobody
-else does, for example to retire an old key. If the key may have been
-stolen, revoke it; replacing a stolen key does not stop the thief.
+else does, to move to a new key; the old key stays valid for what it
+signed. If the key may have been stolen, revoke it: replacing a stolen
+key does not stop the thief. Revoking cannot be undone.
 
 **Replace the key** ("Replace the key"): the app makes a new key and
 signs it with the old one. Phones that trust your old key accept the new
@@ -145,33 +149,40 @@ old key would then lose your new key too.
 
 **If the key was stolen**, or may have been ("Revoke the key"): phones
 stop trusting the key and everything it signed. The app makes a new key
-and signs the newest version of each of your guides again with it. Then:
+and signs the newest version of each of your guides and maps again with
+it. Then:
 
-1. Save a new key backup.
-2. Show your new QR code or link again, in the same places as before.
-   Phones cannot tell you from the thief, so each person decides by
-   adding your new code. Until then your publisher shows as revoked
-   there, and your old code is refused.
+1. Put the statement into your catalog (see "Tell phones about it").
+2. Save a new key backup.
+3. Show your new QR code or link again, only in person or on your
+   official website, where people can see it is really yours. Phones
+   cannot tell you from the thief, so each person decides by adding
+   your new code. Until then your publisher shows as revoked there, and
+   your old code is refused.
 
-**If you lost the computer:** "Revoke a lost key from a backup" uses the
-ready-made revocation in the backup file; it needs no passphrase. You
-then have no key: create a new one in "Publish your own", save a backup
-and show its QR code again. With no backup at all you can neither revoke
-nor replace the key, and phones keep trusting it: ask people to remove
-your publisher and add your new one.
+**If you lost the computer:** "Revoke a lost key from a backup", with
+your newest backup, uses the ready-made revocation in the file; it needs
+no passphrase and cannot be undone. (An older backup holds an older key;
+revoking it also cuts off the keys that replaced it.) You then have no
+key: create a new one in "Publish your own", save a backup and show its
+QR code again, as above. With no backup at all you can neither revoke
+nor replace the key: whoever has the computer can sign in your name
+until people remove your publisher, so ask them to remove it and add
+your new one.
 
 **Tell phones about it.** A replacement or a revocation does nothing on
-phones until they get the statement. After either one:
+phones until they get the statement. After either one, before you
+publish anything signed with the new key:
 
 1. Open `publisher/keys.json` in the desktop app's folder (it holds no
    private key).
-2. Copy its `keys` list into the `catalog.json` you publish, and keep it
-   there from then on.
+2. Copy its whole `keys` list into the `catalog.json` you publish, each
+   time: the earlier statements must stay there too.
 3. Publish the catalog.
 
 Phones learn it from your catalog, also from a copy they fetched
-earlier, from USB sticks made in the desktop app, and from a base or the
-headless node that has it.
+earlier, and from USB sticks made in the desktop app. Do not count on
+anything else to pass it on: put it in your own catalog.
 
 Older versions of the app do not know about replaced or revoked keys:
 they show guides signed by your new key as having a bad signature, and
