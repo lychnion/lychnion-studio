@@ -150,7 +150,8 @@ Future<int> _run(List<String> args) async {
         }
         return 1;
       } on GuideProblem catch (e) {
-        stderr.writeln('The built guide does not open: ${e.message}');
+        // A check that failed, or the file could not be written.
+        stderr.writeln('Could not build the guide: ${e.message}');
         return 1;
       }
     case 'check':
